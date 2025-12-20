@@ -1,19 +1,61 @@
-from motor.stepper import Stepper
+import os
+import sys
 import time
 
-robot = Stepper()
+def clear():
+    os.system("clear")
 
-try:
-    robot.forward(freq=800, duration=2)
+def show_menu():
+    clear()
+    print("===================================")
+    print("        🤖 ROBOT ANA MENÜ 🤖        ")
+    print("===================================")
+    print("1 - Uzaktan Kontrollü Robot")
+    print("2 - Engel Algılayan Robot")
+    print("3 - Webcam Kameralı Robot")
+    print("4 - Işığı Takip Eden Robot")
+    print("5 - Bilgisayar Kontrollü Robot")
+    print("6 - Yön Kontrollü Robot")
+    print("0 - Çıkış")
+    print("===================================")
+
+def run_module(module_name):
+    clear()
+    print(f"{module_name} çalıştırılıyor...\n")
     time.sleep(1)
+    os.system(f"python3 -m {module_name}")
 
-    robot.backward(freq=800, duration=2)
-    time.sleep(1)
+def main():
+    while True:
+        show_menu()
+        secim = input("Seçiminiz: ").strip()
 
-    robot.turn_left(freq=600, duration=1)
-    time.sleep(1)
+        if secim == "1":
+            run_module("modes.remote")
 
-    robot.turn_right(freq=600, duration=1)
+        elif secim == "2":
+            run_module("modes.obstacle")
 
-finally:
-    robot.cleanup()
+        elif secim == "3":
+            run_module("modes.webcam")
+
+        elif secim == "4":
+            run_module("modes.light_follow")
+
+        elif secim == "5":
+            run_module("modes.pc_control")
+
+        elif secim == "6":
+            run_module("modes.direction")
+
+        elif secim == "0":
+            clear()
+            print("Çıkılıyor...")
+            sys.exit(0)
+
+        else:
+            print("Geçersiz seçim!")
+            time.sleep(1)
+
+if __name__ == "__main__":
+    main()
