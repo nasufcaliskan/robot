@@ -1,83 +1,54 @@
 import time
-import RPi.GPIO as GPIO
-
-from motor.stepper import Stepper
-from config.pins import TRIG, ECHO
+import lgpio
 
 
-class UltrasonicSensor:
-    def __init__(self):
-        GPIO.setup(TRIG, GPIO.OUT)
-        GPIO.setup(ECHO, GPIO.IN)
+class Ultrasonic:
+    def __init__(self, trig_pin, echo_pin):
+        self.trig = trig_pin
+        self.echo = echo_pin
 
-        GPIO.output(TRIG, False)
-        time.sleep(0.2)
+        self.chip = lgpio.gpiochip_open(0)
 
-    def distance_cm(self, timeout=0.02):
-        GPIO.output(TRIG, True)
+        lgpio.gpio_claim_output(self.chip, self.trig)
+        lgpio.gpio_claim_input(self.chip, self.echo)
+
+        lgpio.gpio_write(self.chip, self.trig, 0)
+        time.sleep(0.05)
+
+        self.last_distance = 100  # robotun yürüyebilmesi için
+
+    def distance_cm(self):
+        # Trigger
+        lgpio.gpio_write(self.chip, self.trig, 1)
         time.sleep(0.00001)
-        GPIO.output(TRIG, False)
+        lgpio.gpio_write(self.chip, self.trig, 0)
 
-        start = time.time()
+        start_time = time.time()
 
-        while GPIO.input(ECHO) == 0:
-            if time.time() - start > timeout:
-                return None
+        # Echo HIGH bekle (max 5ms)
+        while lgpio.gpio_read(self.chip, self.echo) == 0:
+            if time.time() - start_time > 0.005:
+                return self.last_distance
 
         pulse_start = time.time()
 
-        while GPIO.input(ECHO) == 1:
-            if time.time() - pulse_start > timeout:
-                return None
+        # Echo LOW bekle (max 25ms)
+        while lgpio.gpio_read(self.chip, self.echo) == 1:
+            if time.time() - pulse_start > 0.025:
+                return self.last_distance
 
         pulse_end = time.time()
 
-        duration = pulse_end - pulse_start
-        distance = (duration * 34300) / 2
+        pulse_duration = pulse_end - pulse_start
+        distance = (pulse_duration * 34300) / 2
+        distance = round(distance, 2)
 
-        return round(distance, 2)
+        # mantıksız ölçüm filtre
+        if distance < 3 or distance > 300:
+            return self.last_distance
 
+        self.last_distance = distance
+        return distance
 
-def main():
-    robot = Stepper()      # GPIO burada %100 doğru allocate edilir
-    sensor = UltrasonicSensor()
-
-    SAFE_DISTANCE = 25
-    SPEED = 700
-
-    print("=== ENGEL ALGILAYAN ROBOT ===")
-
-    try:
-        while True:
-            dist = sensor.distance_cm()
-
-            if dist is None:
-                print("Ölçüm yok")
-                robot.stop()
-                time.sleep(0.1)
-                continue
-
-            print(f"Mesafe: {dist} cm")
-
-            if dist > SAFE_DISTANCE:
-                robot.forward(freq=SPEED)
-
-            else:
-                print("ENGEL!")
-                robot.stop()
-                time.sleep(0.1)
-
-                robot.backward()
-                time.sleep(0.1)
-
-                robot.turn_right()
-
-    except KeyboardInterrupt:
-        print("\nDurduruldu")
-
-    finally:
-        robot.cleanup()
-
-
-if __name__ == "__main__":
-    main()
+    def close(self):
+        lgpio.gpiochip_close(self.chip)

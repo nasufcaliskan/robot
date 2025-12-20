@@ -1,86 +1,53 @@
-import RPi.GPIO as GPIO
+import lgpio
 import time
-
-from config.pins import (
-    MOTOR1_STEP, MOTOR1_DIR,
-    MOTOR2_STEP, MOTOR2_DIR
-)
 
 
 class Stepper:
-    def __init__(self, pwm_freq=500):
-        # 🔴 lgpio için ZORUNLU sıralama
-        GPIO.cleanup()                 # eski kilitleri temizle
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
+    def __init__(self,
+                 m1_step=18, m1_dir=17,
+                 m2_step=19, m2_dir=27):
 
-        # Pin setup
-        GPIO.setup(MOTOR1_STEP, GPIO.OUT)
-        GPIO.setup(MOTOR1_DIR, GPIO.OUT)
-        GPIO.setup(MOTOR2_STEP, GPIO.OUT)
-        GPIO.setup(MOTOR2_DIR, GPIO.OUT)
+        # 🔴 DOĞRU GPIO CHIP
+        self.chip = lgpio.gpiochip_open(1)
 
-        # PWM nesneleri
-        self.pwm1 = GPIO.PWM(MOTOR1_STEP, pwm_freq)
-        self.pwm2 = GPIO.PWM(MOTOR2_STEP, pwm_freq)
+        self.M1_STEP = m1_step
+        self.M1_DIR = m1_dir
+        self.M2_STEP = m2_step
+        self.M2_DIR = m2_dir
 
-        self.running1 = False
-        self.running2 = False
+        for pin in (self.M1_STEP, self.M1_DIR,
+                    self.M2_STEP, self.M2_DIR):
+            lgpio.gpio_claim_output(self.chip, pin)
+            lgpio.gpio_write(self.chip, pin, 0)
 
-    # =========================
-    # HAREKETLER
-    # =========================
-    def forward(self, freq=600, duration=0.2):
-        GPIO.output(MOTOR1_DIR, GPIO.HIGH)
-        GPIO.output(MOTOR2_DIR, GPIO.HIGH)
-        self._run(freq, duration)
+    def _pulse(self, steps, delay):
+        for _ in range(steps):
+            lgpio.gpio_write(self.chip, self.M1_STEP, 1)
+            lgpio.gpio_write(self.chip, self.M2_STEP, 1)
+            time.sleep(delay)
+            lgpio.gpio_write(self.chip, self.M1_STEP, 0)
+            lgpio.gpio_write(self.chip, self.M2_STEP, 0)
+            time.sleep(delay)
 
-    def backward(self, freq=600, duration=0.4):
-        GPIO.output(MOTOR1_DIR, GPIO.LOW)
-        GPIO.output(MOTOR2_DIR, GPIO.LOW)
-        self._run(freq, duration)
+    def forward(self, steps=50, speed=500):
+        lgpio.gpio_write(self.chip, self.M1_DIR, 1)
+        lgpio.gpio_write(self.chip, self.M2_DIR, 1)
+        self._pulse(steps, 1 / (2 * speed))
 
-    def turn_left(self, freq=600, duration=0.5):
-        GPIO.output(MOTOR1_DIR, GPIO.LOW)
-        GPIO.output(MOTOR2_DIR, GPIO.HIGH)
-        self._run(freq, duration)
+    def backward(self, steps=50, speed=500):
+        lgpio.gpio_write(self.chip, self.M1_DIR, 0)
+        lgpio.gpio_write(self.chip, self.M2_DIR, 0)
+        self._pulse(steps, 1 / (2 * speed))
 
-    def turn_right(self, freq=600, duration=0.5):
-        GPIO.output(MOTOR1_DIR, GPIO.HIGH)
-        GPIO.output(MOTOR2_DIR, GPIO.LOW)
-        self._run(freq, duration)
+    def turn_left(self, steps=40, speed=500):
+        lgpio.gpio_write(self.chip, self.M1_DIR, 0)
+        lgpio.gpio_write(self.chip, self.M2_DIR, 1)
+        self._pulse(steps, 1 / (2 * speed))
 
-    def stop(self):
-        self.stop_all()
+    def turn_right(self, steps=40, speed=500):
+        lgpio.gpio_write(self.chip, self.M1_DIR, 1)
+        lgpio.gpio_write(self.chip, self.M2_DIR, 0)
+        self._pulse(steps, 1 / (2 * speed))
 
-    def _run(self, freq, duration):
-        self.pwm1.ChangeFrequency(freq)
-        self.pwm2.ChangeFrequency(freq)
-
-        self.pwm1.start(50)
-        self.pwm2.start(50)
-
-        self.running1 = True
-        self.running2 = True
-
-        time.sleep(duration)
-        self.stop_all()
-
-    def stop_all(self):
-        try:
-            self.pwm1.stop()
-        except Exception:
-            pass
-
-        try:
-            self.pwm2.stop()
-        except Exception:
-            pass
-
-        self.running1 = False
-        self.running2 = False
-
-    def cleanup(self):
-        self.stop_all()
-        time.sleep(0.1)
-        GPIO.cleanup()
+    def close(self):
+        lgpio.gpiochip_close(self.chip)

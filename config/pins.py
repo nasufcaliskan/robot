@@ -1,18 +1,19 @@
 """
-GPIO Pin Tanimlamalari
-
+GPIO Pin Tanımlamaları
+Raspberry Pi 5 + DRV8825
+BCM NUMARALANDIRMA
 """
 
 # =========================
 # STEP MOTORLAR (DRV8825)
 # =========================
 
-# Motor 1
-MOTOR1_STEP = 18   # Hardware PWM
+# Sol Motor
+MOTOR1_STEP = 18   # PWM0
 MOTOR1_DIR  = 17
 
-# Motor 2
-MOTOR2_STEP = 19   # Hardware PWM
+# Sağ Motor
+MOTOR2_STEP = 19   # PWM1
 MOTOR2_DIR  = 27
 
 
